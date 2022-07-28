@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option go_package = "nameresolver/proto";
+
+import "request.proto";
+import "response.proto";
+
+service NameResolverService {
+    rpc Hello(EmptyRequest) returns (StringResponse);
+    rpc HealthCheck(EmptyRequest) returns (EmptyResponse);
+}

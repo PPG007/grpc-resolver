@@ -1,0 +1,9 @@
+*.pb.go
+.vscode
+*.pb.gw.go
+*.swagger.json
+cache/*
+*.log
+cert/*
+!cert/gen.sh
+!cert/*.cnf
