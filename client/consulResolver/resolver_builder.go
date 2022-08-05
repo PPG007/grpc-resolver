@@ -12,7 +12,7 @@ const (
 )
 
 func Init() {
-	consulConfig, err := consul.NewConsulConfig("", 0)
+	consulConfig, err := consul.NewConsulConfig(0, 0, "")
 	if err != nil {
 		panic(err.Error())
 	}

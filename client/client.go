@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
 	"log"
@@ -12,7 +11,7 @@ import (
 	"net/http"
 
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -45,9 +44,7 @@ func init() {
 	}
 	cc, err = grpc.Dial(
 		target,
-		grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
-			InsecureSkipVerify: true,
-		})),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultServiceConfig(`{"loadBalancingPolicy":"round_robin"}`),
 	)
 	if err != nil {

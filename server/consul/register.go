@@ -3,6 +3,7 @@ package consul
 import (
 	"fmt"
 	"nameresolver/server/manager"
+	"net/http"
 
 	"github.com/hashicorp/consul/api"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -17,16 +18,18 @@ type consulConfig struct {
 	serverHost          string
 	serverPort          int
 	servicePort         int
+	healthCheckPort     int
 	client              *api.Client
 	healthCheckEndpoint string
 }
 
-func NewConsulConfig(healthCheckEndpoint string, servicePort int) (*consulConfig, error) {
+func NewConsulConfig(servicePort, healthCheckPort int, healthCheckEndpoint string) (*consulConfig, error) {
 	config := api.DefaultConfig()
 	result := &consulConfig{
 		serverHost:          consulHost,
 		serverPort:          consulPort,
 		servicePort:         servicePort,
+		healthCheckPort:     healthCheckPort,
 		healthCheckEndpoint: healthCheckEndpoint,
 	}
 	config.Address = fmt.Sprintf("%s:%d", result.serverHost, result.serverPort)
@@ -49,7 +52,8 @@ func (c *consulConfig) RegisterToCenter(serviceName string) error {
 		Port:    c.servicePort,
 		Address: addresses[0],
 		Check: &api.AgentServiceCheck{
-			HTTP:                           c.healthCheckEndpoint,
+			HTTP:                           fmt.Sprintf("http://%s:%d%s", addresses[0], c.healthCheckPort, c.healthCheckEndpoint),
+			Method:                         http.MethodPost,
 			Interval:                       "10s",
 			DeregisterCriticalServiceAfter: "20s",
 		},

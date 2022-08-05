@@ -7,6 +7,7 @@ import (
 	"log"
 	"nameresolver/proto"
 	"nameresolver/server/consul"
+	"nameresolver/server/manager"
 	"nameresolver/server/nacos"
 	"nameresolver/server/service"
 	"net"
@@ -14,19 +15,17 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 )
 
 var (
-	port                int
-	center              string
-	healthCheckEndpoint string
+	port        int
+	center      string
+	gatewayPort int
 )
 
 const (
-	gatewayPort = 80
 	host        = "127.0.0.1"
 	serviceName = "HelloService"
 
@@ -36,31 +35,30 @@ const (
 
 func init() {
 	flag.IntVar(&port, "port", 0, "server port")
+	flag.IntVar(&gatewayPort, "gatewayPort", 0, "grpc gateway port")
 	flag.StringVar(&center, "center", "", "nacos or consul")
 	flag.Parse()
-	healthCheckEndpoint = fmt.Sprintf("http://%s:%d/ping", host, gatewayPort)
 }
 
-func registerToNacos() {
-	nc, err := nacos.NewNacosConfig(port)
-	if err != nil {
-		panic(err.Error())
+func register(center string) {
+	var serviceManager manager.ServerManager
+	switch center {
+	case CENTER_CONSUL:
+		cc, err := consul.NewConsulConfig(port, gatewayPort, "/ping")
+		if err != nil {
+			panic(err.Error())
+		}
+		serviceManager = cc
+	case CENTER_NACOS:
+		nc, err := nacos.NewNacosConfig(port)
+		if err != nil {
+			panic(err.Error())
+		}
+		serviceManager = nc
+	default:
+		return
 	}
-	err = nc.RegisterToCenter(serviceName)
-	if err != nil {
-		panic(err.Error())
-	}
-}
-
-func registerToConsul() {
-	cc, err := consul.NewConsulConfig(healthCheckEndpoint, port)
-	if err != nil {
-		panic(err.Error())
-	}
-	err = cc.RegisterToCenter(serviceName)
-	if err != nil {
-		panic(err.Error())
-	}
+	serviceManager.RegisterToCenter(serviceName)
 }
 
 func startGrpcGateway(ctx context.Context, serverPort, startPort int) {
@@ -76,13 +74,8 @@ func startGrpcGateway(ctx context.Context, serverPort, startPort int) {
 
 func main() {
 	log.Printf("Server will start at port: %d\n", port)
-	crt, err := credentials.NewServerTLSFromFile("/home/user/playground/grpc-resolver/cert/localhost.crt", "/home/user/playground/grpc-resolver/cert/prikey.pem")
-	if err != nil {
-		panic(err.Error())
-	}
-	grpcServer := grpc.NewServer(
-		grpc.Creds(crt),
-	)
+	log.Printf("Grpc gateway will start at port: %d\n", gatewayPort)
+	grpcServer := grpc.NewServer()
 	proto.RegisterNameResolverServiceServer(grpcServer, service.NameResolverService{})
 	l, err := net.Listen("tcp", fmt.Sprintf("0.0.0.0:%d", port))
 	if err != nil {
@@ -90,12 +83,7 @@ func main() {
 	}
 	reflection.Register(grpcServer)
 	go startGrpcGateway(context.Background(), port, gatewayPort)
-	if center == CENTER_CONSUL {
-		registerToConsul()
-	}
-	if center == CENTER_NACOS {
-		registerToNacos()
-	}
+	register(center)
 	err = grpcServer.Serve(l)
 	if err != nil {
 		panic(err)
